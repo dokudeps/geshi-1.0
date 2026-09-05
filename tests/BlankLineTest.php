@@ -37,7 +37,7 @@ class BlankLineTest extends TestCase
         $output = $geshi->parse_code();
 
         $this->assertStringNotContainsString('&nbsp;', $output);
-        $this->assertStringNotContainsString(GeSHi::BLANK_LINE_FILLER, $output);
+        $this->assertStringNotContainsString(GeSHi::BLANK_LINE_CLASS, $output);
     }
 
     /**
@@ -70,7 +70,7 @@ class BlankLineTest extends TestCase
         if ($highlight) $geshi->highlight_lines_extra($highlight);
         $output = $geshi->parse_code();
 
-        $this->assertStringContainsString(GeSHi::BLANK_LINE_FILLER, $output);
+        $this->assertStringContainsString('<span class="' . GeSHi::BLANK_LINE_CLASS . '"></span>', $output);
         $this->assertStringNotContainsString('&nbsp;', $output);
         $this->assertSame($this->source(), $this->plainText($output));
     }
@@ -121,7 +121,7 @@ class BlankLineTest extends TestCase
         $geshi->enable_line_numbers(GESHI_NORMAL_LINE_NUMBERS);
         $output = $geshi->parse_code();
 
-        $this->assertStringNotContainsString(GeSHi::BLANK_LINE_FILLER, $output);
+        $this->assertStringNotContainsString(GeSHi::BLANK_LINE_CLASS, $output);
         $this->assertSame("aaaa a=42\n    \nbbbb b=56", $this->plainText($output));
     }
 
@@ -135,6 +135,45 @@ class BlankLineTest extends TestCase
             'pre' => array(GESHI_HEADER_PRE),
             'pre valid' => array(GESHI_HEADER_PRE_VALID),
         );
+    }
+
+    /**
+     * With classes enabled the filler carries no style attribute of its own,
+     * the rule ships with the generated stylesheet instead
+     */
+    public function testFillerUsesClasses()
+    {
+        $geshi = new GeSHi($this->source(), 'bash');
+        $geshi->enable_classes();
+        $geshi->set_header_type(GESHI_HEADER_PRE);
+        $geshi->enable_line_numbers(GESHI_NORMAL_LINE_NUMBERS);
+
+        $this->assertStringContainsString(
+            '<span class="' . GeSHi::BLANK_LINE_CLASS . '"></span>',
+            $geshi->parse_code()
+        );
+        $this->assertStringContainsString(
+            'span.' . GeSHi::BLANK_LINE_CLASS . ' { ' . GeSHi::BLANK_LINE_STYLE . ' }',
+            $geshi->get_stylesheet()
+        );
+    }
+
+    /**
+     * Without classes there is no stylesheet to put the rule in, so the filler
+     * has to carry the style itself
+     */
+    public function testFillerFallsBackToInlineStyle()
+    {
+        $geshi = new GeSHi($this->source(), 'bash');
+        $geshi->set_header_type(GESHI_HEADER_PRE);
+        $geshi->enable_line_numbers(GESHI_NORMAL_LINE_NUMBERS);
+        $output = $geshi->parse_code();
+
+        $this->assertStringContainsString(
+            '<span style="' . GeSHi::BLANK_LINE_STYLE . '"></span>',
+            $output
+        );
+        $this->assertStringNotContainsString('&nbsp;', $output);
     }
 
     /**
