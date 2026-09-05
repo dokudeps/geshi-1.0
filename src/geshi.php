@@ -226,6 +226,27 @@ define('GESHI_ERROR_INVALID_LINE_NUMBER_TYPE', 5);
 class GeSHi {
 
     /**
+     * Class of the filler element used for lines that are empty but must not collapse
+     *
+     * Lines wrapped in a block level element (a list item when line numbers are
+     * used, a block span for highlighted lines) generate no line box when they
+     * are empty and would collapse to zero height. An empty inline-block forces
+     * a line box without contributing any text, so the line keeps its height and
+     * still comes out empty when the code block is selected or copied.
+     *
+     * @see GeSHi::BLANK_LINE_STYLE
+     */
+    const BLANK_LINE_CLASS = 'blank';
+
+    /**
+     * The style behind GeSHi::BLANK_LINE_CLASS
+     *
+     * Written into a style attribute when classes are disabled, and into the
+     * generated stylesheet when they are enabled.
+     */
+    const BLANK_LINE_STYLE = 'display:inline-block;';
+
+    /**
      * The source code to highlight
      * @var string
      */
@@ -3112,6 +3133,23 @@ class GeSHi {
     }
 
     /**
+     * Builds the filler element for a line that is empty but must not collapse
+     *
+     * Uses a class when classes are enabled, so the markup stays free of style
+     * attributes and the rule ships with the generated stylesheet. Falls back to
+     * an inline style otherwise, because then there is no stylesheet to put it in.
+     *
+     * @return string
+     * @since  1.0.9.2
+     */
+    protected function blank_line_filler() {
+        if ($this->use_classes) {
+            return '<span class="' . self::BLANK_LINE_CLASS . '"></span>';
+        }
+        return '<span style="' . self::BLANK_LINE_STYLE . '"></span>';
+    }
+
+    /**
      * Swaps out spaces and tabs for HTML indentation. Not needed if
      * the code is in a pre block...
      *
@@ -3865,10 +3903,16 @@ class GeSHi {
                 //Reset the attributes for a new line ...
                 $attrs = array();
 
-                // Make lines have at least one space in them if they're empty
-                // BenBE: Checking emptiness using trim instead of relying on blanks
-                if ('' == trim($code[$i])) {
-                    $code[$i] = '&nbsp;';
+                // Every line goes into its own list item here, so empty ones need
+                // a filler to keep their height.
+                //
+                // Strictly empty, not trim(): a line of whitespace has content that
+                // has to survive copy&paste. It can only reach this point as bare
+                // whitespace when the output goes into a <pre> - indent() has turned
+                // it into entities for every other header type - so white-space:pre
+                // applies and the line keeps both its height and its content.
+                if ('' === $code[$i]) {
+                    $code[$i] = $this->blank_line_filler();
                 }
 
                 // If this is a "special line"...
@@ -4005,11 +4049,6 @@ class GeSHi {
             // Have to use divs so the full width of the code is highlighted
             $close = 0;
             for ($i = 0; $i < $n; ++$i) {
-                // Make lines have at least one space in them if they're empty
-                // BenBE: Checking emptiness using trim instead of relying on blanks
-                if ('' == trim($code[$i])) {
-                    $code[$i] = '&nbsp;';
-                }
                 // fancy lines
                 if ($this->line_numbers == GESHI_FANCY_LINE_NUMBERS &&
                     $i % $this->line_nth_row == ($this->line_nth_row - 1)) {
@@ -4037,6 +4076,14 @@ class GeSHi {
                         $parsed_code .= "<span style=\"display:block;" . $this->get_line_style($i) . "\">";
                     }
                     ++$close;
+                }
+
+                // Empty lines only need a filler when they were wrapped in a block
+                // level element above. Unwrapped lines are plain text inside a <pre>
+                // and render just fine when they are empty. Strictly empty for the
+                // same reason as above: whitespace is content and is kept as is.
+                if ($close && '' === $code[$i]) {
+                    $code[$i] = $this->blank_line_filler();
                 }
 
                 $parsed_code .= $code[$i];
@@ -4528,6 +4575,7 @@ class GeSHi {
             $stylesheet .= "{$selector}.ln-xtra, {$selector}li.ln-xtra, {$selector}div.ln-xtra {{$this->highlight_extra_lines_style}}\n";
         }
         $stylesheet .= "{$selector}span.xtra { display:block; }\n";
+        $stylesheet .= "{$selector}span." . self::BLANK_LINE_CLASS . " { " . self::BLANK_LINE_STYLE . " }\n";
         foreach ($this->highlight_extra_lines_styles as $lineid => $linestyle) {
             $stylesheet .= "{$selector}.lx$lineid, {$selector}li.lx$lineid, {$selector}div.lx$lineid {{$linestyle}}\n";
         }
