@@ -3,7 +3,11 @@
 use PHPUnit\Framework\TestCase;
 
 /**
- * Blank lines should stay blank unless the markup requires filling them
+ * Blank lines must not put any text into the output
+ *
+ * Whatever is used to keep an empty line from collapsing ends up in the
+ * clipboard when the code block is selected or copied, so it may not be a
+ * character.
  *
  * @link https://github.com/dokuwiki/dokuwiki/issues/2614
  */
@@ -18,7 +22,7 @@ class BlankLineTest extends TestCase
     }
 
     /**
-     * Plain <pre> output renders blank lines just fine, no filler needed
+     * Plain <pre> output renders blank lines just fine, no filler needed at all
      *
      * @dataProvider providePreHeaders
      * @param int $header_type
@@ -33,6 +37,7 @@ class BlankLineTest extends TestCase
         $output = $geshi->parse_code();
 
         $this->assertStringNotContainsString('&nbsp;', $output);
+        $this->assertStringNotContainsString(GeSHi::BLANK_LINE_FILLER, $output);
     }
 
     /**
@@ -45,6 +50,41 @@ class BlankLineTest extends TestCase
             'pre' => array(GESHI_HEADER_PRE),
             'pre valid' => array(GESHI_HEADER_PRE_VALID),
             'pre table' => array(GESHI_HEADER_PRE_TABLE),
+        );
+    }
+
+    /**
+     * Lines wrapped in a block level element would collapse when empty, those
+     * get a filler - but one that does not add any text
+     *
+     * @dataProvider provideWrappingSetups
+     * @param int $line_numbers
+     * @param array $highlight
+     */
+    public function testWrappedLines($line_numbers, $highlight)
+    {
+        $geshi = new GeSHi($this->source(), 'bash');
+        $geshi->enable_classes();
+        $geshi->set_header_type(GESHI_HEADER_PRE);
+        $geshi->enable_line_numbers($line_numbers);
+        if ($highlight) $geshi->highlight_lines_extra($highlight);
+        $output = $geshi->parse_code();
+
+        $this->assertStringContainsString(GeSHi::BLANK_LINE_FILLER, $output);
+        $this->assertStringNotContainsString('&nbsp;', $output);
+        $this->assertSame($this->source(), $this->plainText($output));
+    }
+
+    /**
+     * @return array
+     */
+    public function provideWrappingSetups()
+    {
+        class_exists('GeSHi'); // make sure the constants are defined
+        return array(
+            'line numbers' => array(GESHI_NORMAL_LINE_NUMBERS, null),
+            'fancy line numbers' => array(GESHI_FANCY_LINE_NUMBERS, null),
+            'highlighted lines' => array(GESHI_NO_LINE_NUMBERS, array(1, 2, 3, 4, 5)),
         );
     }
 
@@ -64,44 +104,20 @@ class BlankLineTest extends TestCase
     }
 
     /**
-     * Lines wrapped in a block level element would collapse when empty,
-     * those still need a filler
-     */
-    public function testHighlightedLines()
-    {
-        $geshi = new GeSHi($this->source(), 'bash');
-        $geshi->enable_classes();
-        $geshi->set_header_type(GESHI_HEADER_PRE);
-        $geshi->highlight_lines_extra(array(1, 2, 3));
-        $output = $geshi->parse_code();
-
-        $this->assertStringContainsString('<span class="xtra ln-xtra">&nbsp;</span>', $output);
-    }
-
-    /**
-     * Line numbers put every line into its own list item, those need a filler
-     */
-    public function testLineNumbers()
-    {
-        $geshi = new GeSHi($this->source(), 'bash');
-        $geshi->enable_classes();
-        $geshi->set_header_type(GESHI_HEADER_PRE);
-        $geshi->enable_line_numbers(GESHI_NORMAL_LINE_NUMBERS);
-        $output = $geshi->parse_code();
-
-        $this->assertStringContainsString('<div class="de1">&nbsp;</div>', $output);
-    }
-
-    /**
      * Strip all markup from the given output, undoing the entity encoding
+     *
+     * List items are the only block elements in the output that stand for a
+     * line, everything else is separated by newlines already.
      *
      * @param string $output
      * @return string
      */
     protected function plainText($output)
     {
-        $text = preg_replace('/^<[^>]+>|<[^>]+>$/', '', trim($output));
-        $text = strip_tags($text);
+        $text = trim($output);
+        $text = preg_replace('/^<[^>]+>|<[^>]+>$/', '', $text);
+        $text = str_replace('</li>', "\n", $text);
+        $text = trim(strip_tags($text), "\n");
         return html_entity_decode($text, ENT_QUOTES, 'UTF-8');
     }
 }

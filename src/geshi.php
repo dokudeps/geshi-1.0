@@ -226,6 +226,17 @@ define('GESHI_ERROR_INVALID_LINE_NUMBER_TYPE', 5);
 class GeSHi {
 
     /**
+     * Filler for lines that are empty but must not collapse
+     *
+     * Lines wrapped in a block level element (a list item when line numbers are
+     * used, a block span for highlighted lines) generate no line box when they
+     * are empty and would collapse to zero height. An empty inline-block forces
+     * a line box without contributing any text, so the line keeps its height and
+     * still comes out empty when the code block is selected or copied.
+     */
+    const BLANK_LINE_FILLER = '<span style="display:inline-block"></span>';
+
+    /**
      * The source code to highlight
      * @var string
      */
@@ -3865,10 +3876,10 @@ class GeSHi {
                 //Reset the attributes for a new line ...
                 $attrs = array();
 
-                // Make lines have at least one space in them if they're empty
-                // BenBE: Checking emptiness using trim instead of relying on blanks
-                if ('' == trim($code[$i])) {
-                    $code[$i] = '&nbsp;';
+                // Every line goes into its own list item here, so empty ones need
+                // a filler to keep their height
+                if ('' === $code[$i]) {
+                    $code[$i] = self::BLANK_LINE_FILLER;
                 }
 
                 // If this is a "special line"...
@@ -4034,12 +4045,11 @@ class GeSHi {
                     ++$close;
                 }
 
-                // Make lines have at least one space in them if they're empty, but
-                // only if they are wrapped in a block level element which would
-                // collapse to zero height otherwise. Unwrapped lines are plain text
-                // inside a <pre> and render just fine when they are empty.
-                if ($close && '' == trim($code[$i])) {
-                    $code[$i] = '&nbsp;';
+                // Empty lines only need a filler when they were wrapped in a block
+                // level element above. Unwrapped lines are plain text inside a <pre>
+                // and render just fine when they are empty.
+                if ($close && '' === $code[$i]) {
+                    $code[$i] = self::BLANK_LINE_FILLER;
                 }
 
                 $parsed_code .= $code[$i];
