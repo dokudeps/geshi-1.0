@@ -3877,7 +3877,13 @@ class GeSHi {
                 $attrs = array();
 
                 // Every line goes into its own list item here, so empty ones need
-                // a filler to keep their height
+                // a filler to keep their height.
+                //
+                // Strictly empty, not trim(): a line of whitespace has content that
+                // has to survive copy&paste. It can only reach this point as bare
+                // whitespace when the output goes into a <pre> - indent() has turned
+                // it into entities for every other header type - so white-space:pre
+                // applies and the line keeps both its height and its content.
                 if ('' === $code[$i]) {
                     $code[$i] = self::BLANK_LINE_FILLER;
                 }
@@ -4047,7 +4053,8 @@ class GeSHi {
 
                 // Empty lines only need a filler when they were wrapped in a block
                 // level element above. Unwrapped lines are plain text inside a <pre>
-                // and render just fine when they are empty.
+                // and render just fine when they are empty. Strictly empty for the
+                // same reason as above: whitespace is content and is kept as is.
                 if ($close && '' === $code[$i]) {
                     $code[$i] = self::BLANK_LINE_FILLER;
                 }

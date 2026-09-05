@@ -104,6 +104,40 @@ class BlankLineTest extends TestCase
     }
 
     /**
+     * A line of whitespace is content, it must not be swallowed by the filler
+     *
+     * Bare whitespace only ever reaches the output inside a <pre>, where it keeps
+     * both its height and its content. indent() turns it into entities for the
+     * other header types.
+     *
+     * @dataProvider providePreservingHeaders
+     * @param int $header_type
+     */
+    public function testWhitespaceOnlyLine($header_type)
+    {
+        $geshi = new GeSHi("aaaa a=42\n    \nbbbb b=56", 'bash');
+        $geshi->enable_classes();
+        $geshi->set_header_type($header_type);
+        $geshi->enable_line_numbers(GESHI_NORMAL_LINE_NUMBERS);
+        $output = $geshi->parse_code();
+
+        $this->assertStringNotContainsString(GeSHi::BLANK_LINE_FILLER, $output);
+        $this->assertSame("aaaa a=42\n    \nbbbb b=56", $this->plainText($output));
+    }
+
+    /**
+     * @return array
+     */
+    public function providePreservingHeaders()
+    {
+        class_exists('GeSHi'); // make sure the constants are defined
+        return array(
+            'pre' => array(GESHI_HEADER_PRE),
+            'pre valid' => array(GESHI_HEADER_PRE_VALID),
+        );
+    }
+
+    /**
      * Strip all markup from the given output, undoing the entity encoding
      *
      * List items are the only block elements in the output that stand for a
