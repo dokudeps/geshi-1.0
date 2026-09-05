@@ -4005,11 +4005,6 @@ class GeSHi {
             // Have to use divs so the full width of the code is highlighted
             $close = 0;
             for ($i = 0; $i < $n; ++$i) {
-                // Make lines have at least one space in them if they're empty
-                // BenBE: Checking emptiness using trim instead of relying on blanks
-                if ('' == trim($code[$i])) {
-                    $code[$i] = '&nbsp;';
-                }
                 // fancy lines
                 if ($this->line_numbers == GESHI_FANCY_LINE_NUMBERS &&
                     $i % $this->line_nth_row == ($this->line_nth_row - 1)) {
@@ -4037,6 +4032,14 @@ class GeSHi {
                         $parsed_code .= "<span style=\"display:block;" . $this->get_line_style($i) . "\">";
                     }
                     ++$close;
+                }
+
+                // Make lines have at least one space in them if they're empty, but
+                // only if they are wrapped in a block level element which would
+                // collapse to zero height otherwise. Unwrapped lines are plain text
+                // inside a <pre> and render just fine when they are empty.
+                if ($close && '' == trim($code[$i])) {
+                    $code[$i] = '&nbsp;';
                 }
 
                 $parsed_code .= $code[$i];
